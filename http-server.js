@@ -136,7 +136,7 @@ class HTTP {
                     - Safe: GET requests should not cause side effects
                     - Idempotent: Multiple identical GET requests have same effect
                     - Cacheable: GET responses can be cached (RFC 7234)`;
-                                    break;
+                break;
 
             case '/api/info':
                 responseBody = `HTTP Server Information (GET /api/info)
@@ -180,6 +180,134 @@ class HTTP {
         }, responseBody);
     }
 
+    handlePOST(request) {
+        console.log('=== POST Request Handling ===');
+        console.log('RFC 7231: POST method for resource creation');
+        console.log('Path:', request.path);
+        console.log('Headers:', request.headers);
+        console.log('Body length:', request.body.length);
+        console.log('==========================');
+
+        let parsedBody = {};
+        let contentType = request.headers['content-type'] || 'text/plain';
+        
+        try {
+            if (contentType.includes('application/json')) {
+                parsedBody = JSON.parse(request.body);
+            } else if (contentType.includes('application/x-www-form-urlencoded')) {
+                request.body.split('&').forEach(param => {
+                    const [key, value] = param.split('=');
+                    if (key) {
+                        parsedBody[decodeURIComponent(key)] = decodeURIComponent(value || '');
+                    }
+                });
+            } else {
+                parsedBody = { content: request.body };
+            }
+        } catch (error) {
+            console.log('Error parsing POST body:', error);
+            return this.createResponse(400, {
+                'Content-Type': 'text/plain'
+            }, 'Bad Request - Invalid request body format');
+        }
+
+        let responseBody = '';
+        let statusCode = 201;
+
+        switch (request.path) {
+            case '/api/users':
+                responseBody = `POST Request Processed Successfully!
+
+                    RFC 7231 Compliance:
+                    - Method: POST (Resource Creation)
+                    - Path: ${request.path}
+                    - Version: ${request.version}
+                    - Status: 201 Created
+
+                    Request Details:
+                    - Content-Type: ${contentType}
+                    - Body Length: ${request.body.length} bytes
+                    - Host: ${request.headers.host || 'Not specified'}
+
+                    Parsed Body:
+                    ${JSON.stringify(parsedBody, null, 2)}
+
+                    RFC 7231 Section 4.3.3: POST method characteristics:
+                    1. Not Safe: May cause side effects on server
+                    2. Not Idempotent: Multiple requests may have different effects
+                    3. Not Cacheable: Responses should not be cached
+                    4. Body: Contains data to be processed
+
+                    RFC References:
+                    - RFC 7231 Section 4.3.3: POST method definition
+                    - RFC 7231 Section 6.3.2: 201 Created status code
+                    - RFC 3986: URI syntax and resource identification`;
+                break;
+
+            case '/api/data':
+                responseBody = `Data Processing Complete (POST /api/data)
+
+                    RFC 7231: POST method for data processing
+                    Status: 201 Created
+                    Timestamp: ${new Date().toISOString()}
+
+                    Received Data:
+                    ${JSON.stringify(parsedBody, null, 2)}
+
+                    Processing Results:
+                    - Data Type: ${contentType}
+                    - Fields Count: ${Object.keys(parsedBody).length}
+                    - Processing Time: ${Date.now()}ms
+
+                    RFC Compliance:
+                    - Not Safe: POST may cause side effects
+                    - Not Idempotent: Multiple requests may have different effects
+                    - Not Cacheable: Responses should not be cached
+                    - Body Required: POST requests should have a body (RFC 7231 Section 4.3.3)`;
+                break;
+
+            case '/api/echo':
+                responseBody = `Echo Response (POST /api/echo)
+
+                    RFC 7231: POST method for data submission
+                    Status: 200 OK
+
+                    Original Request:
+                    - Method: ${request.method}
+                    - Path: ${request.path}
+                    - Content-Type: ${contentType}
+                    - Body Length: ${request.body.length} bytes
+
+                    Echoed Data:
+                    ${JSON.stringify(parsedBody, null, 2)}
+
+                    RFC 7231 Section 4.3.3: POST method characteristics:
+                    - Purpose: Submit data to be processed
+                    - Body: Contains the data to be processed
+                    - Response: Contains the result of processing`;
+                break;
+
+            default:
+                statusCode = 404;
+                responseBody = `404 Not Found
+
+                    RFC 7231: POST method for resource creation
+                    Requested path '${request.path}' not found.
+
+                    Available POST endpoints:
+                    - POST /api/users - Create user resource
+                    - POST /api/data - Process data
+                    - POST /api/echo - Echo back request data
+
+                    RFC 7231 Section 6.5.4: 404 Not Found status code
+                    The origin server did not find a current representation for the target resource.`;
+        }
+
+        return this.createResponse(statusCode, {
+            'Content-Type': 'text/plain'
+        }, responseBody);
+    }
+
     start() {
         this.server = net.createServer((socket) => {
             console.log('Client connected::', socket.remoteAddress);
@@ -207,10 +335,7 @@ class HTTP {
                                 response = this.handleGET(request);
                                 break;
                             case 'POST':
-                                // TODO: Implement POST handling in next step
-                                response = this.createResponse(501, {
-                                    'Content-Type': 'text/plain'
-                                }, '501 Not Implemented - POST method not yet implemented');
+                                response = this.handlePOST(request);
                                 break;
                             default:
                                 response = this.createResponse(405, {
