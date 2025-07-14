@@ -6,13 +6,71 @@ class HTTP {
         this.server = null;
     }
 
+    parseRequest(data) {
+        const requestString = data.toString();
+        const lines = requestString.split('\r\n');
+        
+        const requestLine = lines[0];
+        const [method, path, version] = requestLine.split(' ');
+        
+        const headers = {};
+        let bodyStartIndex = -1;
+        
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            
+            if (line === '') {
+                bodyStartIndex = i + 1;
+                break;
+            }
+            
+            const colonIndex = line.indexOf(':');
+            if (colonIndex !== -1) {
+                const key = line.substring(0, colonIndex).toLowerCase();
+                const value = line.substring(colonIndex + 1).trim();
+                headers[key] = value;
+            }
+        }
+        
+        let body = '';
+        if (bodyStartIndex !== -1 && bodyStartIndex < lines.length) {
+            body = lines.slice(bodyStartIndex).join('\r\n');
+        }
+        
+        return {
+            method,
+            path,
+            version,
+            headers,
+            body
+        };
+    }
+
     start() {
         this.server = net.createServer((socket) => {
             console.log('Client connected::', socket.remoteAddress);
             
-            socket.on('data',(data) => {
-                console.log('Receieved Data in Bytes::', data);
-                console.log('Recieved Data in String::', data.toString());
+            let data = '';
+            
+            socket.on('data', (chunk) => {
+                data += chunk;
+                
+                if (data.includes('\r\n\r\n')) {
+                    try {
+                        const request = this.parseRequest(data);
+                        console.log('=== HTTP Request Parsed ===');
+                        console.log('Method::', request.method);
+                        console.log('Path::', request.path);
+                        console.log('Version::', request.version);
+                        console.log('Headers::', request.headers);
+                        console.log('Body::', request.body);
+                        console.log('==========================');
+                        
+                    } catch (error) {
+                        console.log('Error parsing HTTP request::', error);
+                        socket.end();
+                    }
+                }
             })
 
             socket.on('error', (error) => {

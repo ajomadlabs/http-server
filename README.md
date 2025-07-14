@@ -6,108 +6,158 @@ A step-by-step implementation of an HTTP server from scratch using Node.js. This
 
 The goal is to build a complete HTTP server from scratch, understanding each component as we add it. We'll start with basic TCP connections and gradually build up to a full HTTP implementation.
 
-## Current Implementation: Step 1 - Basic TCP Server
+## Current Implementation: Step 2 - HTTP Request Parsing
 
 ### What We Have So Far
 
-In this first step, we've implemented a basic TCP server that:
-- Listens on port 4000 (or a custom port)
-- Accepts incoming connections
-- Logs connection events
-- Receives raw data from clients
-
-### The HTTP Class
-
-```javascript
-class HTTP {
-    constructor(port = 4000) {
-        this.port = port;
-        this.server = null;
-    }
-    
-    start() {
-        // TCP server implementation
-    }
-}
-```
-
-#### Constructor Explained
-
-The constructor initializes our HTTP server class:
-
-- **`this.port = port`**: Stores the port number (defaults to 4000 if not provided)
-- **`this.server = null`**: Initializes the server property to null. This will hold our TCP server instance once created
-
-**Why initialize these variables?**
-- **Port**: We need to remember which port to listen on
-- **Server**: We need a reference to the server instance so we can control it (start, stop, etc.)
-
-### The `start()` Method
-
-```javascript
-start() {
-    this.server = net.createServer((socket) => {
-        // Handle incoming connections
-    });
-    
-    this.server.listen(this.port, () => {
-        console.log('Server Started at Port::', this.port);
-    });
-}
-```
-
-#### What `net.createServer()` Does
-
-The `net.createServer()` function from Node.js creates a TCP server:
-
-- **TCP (Transmission Control Protocol)**: A connection-oriented protocol that ensures reliable data delivery
-- **Why TCP?**: HTTP is built on top of TCP. TCP provides the reliable connection that HTTP needs
-- **Connection Callback**: The function we pass to `createServer()` is called every time a client connects
-
-#### Socket Events Explained
-
-```javascript
-socket.on('data', (data) => {
-    console.log('Received Data in Bytes::', data);
-    console.log('Received Data in String::', data.toString());
-});
-
-socket.on('error', (error) => {
-    console.log('Socket Error ::', error);
-});
-
-socket.on('close', () => {
-    console.log('Client Disconnected::', socket.remoteAddress);
-});
-```
-
-**Socket Events:**
-- **`'data'`**: Fired when the server receives data from the client
-  - `data` parameter contains the raw bytes received
-  - We can convert it to string using `data.toString()`
-- **`'error'`**: Fired when there's an error with the socket connection
-  - Network issues, client disconnection, etc.
-- **`'close'`**: Fired when the client disconnects
-  - `socket.remoteAddress` tells us the client's IP address
-
-### Why Use the `net` Module?
-
-The `net` module in Node.js provides:
-- **Low-level TCP networking**: Direct access to TCP sockets
-- **Event-driven API**: Uses Node.js event system for handling connections
-- **Cross-platform**: Works on Windows, macOS, Linux
-- **Performance**: Efficient for handling multiple concurrent connections
-
-### Current Limitations
-
-At this stage, our server:
+In this step, we've added HTTP request parsing capabilities:
 - ✅ Accepts TCP connections
 - ✅ Receives raw data
-- ✅ Logs connection events
-- ❌ Doesn't understand HTTP protocol
-- ❌ Doesn't parse HTTP requests
-- ❌ Doesn't send proper HTTP responses
-- ❌ Doesn't handle different HTTP methods (GET, POST, etc.)
+- ✅ **NEW**: Parses HTTP requests according to HTTP specification
+- ✅ **NEW**: Extracts HTTP method, path, version, headers, and body
+- ✅ **NEW**: Handles complete HTTP request detection
+- ❌ Doesn't send proper HTTP responses yet
+- ❌ Doesn't handle different routes yet
+
+### HTTP Request Specification Implementation
+
+The HTTP specification defines that a request consists of:
+1. **Request Line**: `METHOD PATH VERSION`
+2. **Headers**: Key-value pairs separated by `:`
+3. **Empty Line**: `\r\n\r\n` marks the end of headers
+4. **Body**: Optional data after the empty line
+
+#### The `parseRequest()` Method
+
+```javascript
+parseRequest(data) {
+    const requestString = data.toString();
+    const lines = requestString.split('\r\n');
+    
+    // Parse request line (first line)
+    const requestLine = lines[0];
+    const [method, path, version] = requestLine.split(' ');
+    
+
+    const headers = {};
+    let bodyStartIndex = -1;
+    
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        
+
+        if (line === '') {
+            bodyStartIndex = i + 1;
+            break;
+        }
+        
+
+        const colonIndex = line.indexOf(':');
+        if (colonIndex !== -1) {
+            const key = line.substring(0, colonIndex).toLowerCase();
+            const value = line.substring(colonIndex + 1).trim();
+            headers[key] = value;
+        }
+    }
+    
+
+    let body = '';
+    if (bodyStartIndex !== -1 && bodyStartIndex < lines.length) {
+        body = lines.slice(bodyStartIndex).join('\r\n');
+    }
+    
+    return { method, path, version, headers, body };
+}
+```
+
+#### How HTTP Request Parsing Works
+
+**1. Request Line Parsing:**
+- First line: `GET / HTTP/1.1`
+- Split by space: `[method, path, version]`
+- Example: `["GET", "/", "HTTP/1.1"]`
+
+**2. Header Parsing:**
+- Each header line: `Key: Value`
+- Split by first colon: `key.toLowerCase()` and `value.trim()`
+- Headers are case-insensitive according to HTTP spec
+- Example: `{"host": "localhost:4000", "user-agent": "curl/7.68.0"}`
+
+**3. Body Detection:**
+- Empty line (`\r\n\r\n`) marks end of headers
+- Everything after empty line is the body
+- Body can be empty for GET requests
+
+**4. Complete Request Detection:**
+- We accumulate data until we see `\r\n\r\n`
+- This ensures we have the complete HTTP request before parsing
+
+### HTTP Request Structure
+
+The parsed request object contains:
+
+```javascript
+{
+    method: "GET",           
+    path: "/",             
+    version: "HTTP/1.1",    
+    headers: {             
+        "host": "localhost:4000",
+        "user-agent": "curl/7.68.0",
+        "accept": "*/*"
+    },
+    body: ""                
+}
+```
+
+### Enhanced Data Handling
+
+Instead of just logging raw data, we now:
+
+```javascript
+let data = '';
+
+socket.on('data', (chunk) => {
+    data += chunk;
+    
+   
+    if (data.includes('\r\n\r\n')) {
+        try {
+            const request = this.parseRequest(data);
+            console.log('=== HTTP Request Parsed ===');
+            console.log('Method:', request.method);
+            console.log('Path:', request.path);
+            console.log('Version:', request.version);
+            console.log('Headers:', request.headers);
+            console.log('Body:', request.body);
+            console.log('==========================');
+            
+
+            
+        } catch (error) {
+            console.log('Error parsing HTTP request:', error);
+            socket.end();
+        }
+    }
+});
+```
+
+### HTTP Specification Compliance
+
+Our parser follows the HTTP/1.1 specification:
+
+- **Request Line Format**: `METHOD SP PATH SP VERSION CRLF`
+- **Header Format**: `KEY: VALUE CRLF`
+- **Header Separation**: Empty line (`CRLF`)
+- **Body**: Optional data after empty line
+- **Line Endings**: `\r\n` (CRLF) as per HTTP spec
+
+### Error Handling
+
+We've added basic error handling:
+- **Parsing Errors**: Return 400 Bad Request if request can't be parsed
+- **Malformed Requests**: Gracefully handle incomplete or invalid HTTP requests
+- **Connection Errors**: Log socket errors for debugging
 
 ## How to Run
 
@@ -122,51 +172,71 @@ Server Started at Port:: 4000
 
 ## Testing the Current Implementation
 
-You can test the current TCP server using:
+You can test the HTTP request parsing using:
 
 ```bash
-# Using telnet (if available)
-telnet localhost 4000
+# Basic GET request
+curl http://localhost:4000/
 
-# Using netcat (if available)
-nc localhost 4000
+# POST request with body
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"message": "Hello World"}' \
+  http://localhost:4000/api/test
 
-# Using curl (will show raw TCP behavior)
-curl -v http://localhost:4000
+# Request with custom headers
+curl -H "X-Custom-Header: test" \
+  -H "Authorization: Bearer token123" \
+  http://localhost:4000/
 ```
 
-When you connect, you'll see logs like:
+When you make requests, you'll see detailed parsing output:
 ```
 Client connected:: ::1
-Received Data in Bytes:: <Buffer 47 45 54 20 2f 20 48 54 54 50 2f 31 2e 31 0d 0a...>
-Received Data in String:: GET / HTTP/1.1
-Host: localhost:4000
-...
+=== HTTP Request Parsed ===
+Method: GET
+Path: /
+Version: HTTP/1.1
+Headers: {
+  host: 'localhost:4000',
+  user-agent: 'curl/7.68.0',
+  accept: '*/*'
+}
+Body: 
+==========================
 ```
 
 ## Learning Points
 
-### TCP vs HTTP
-- **TCP**: Raw byte stream protocol (what we're using now)
-- **HTTP**: Application protocol built on top of TCP (what we'll implement next)
+### HTTP Protocol Structure
+- **Request Line**: Contains method, path, and HTTP version
+- **Headers**: Key-value pairs providing metadata
+- **Body**: Optional data payload
+- **Line Endings**: HTTP uses `\r\n` (CRLF) for line endings
 
-### Socket Programming Concepts
-- **Socket**: An endpoint for communication between two machines
-- **Server Socket**: Listens for incoming connections
-- **Client Socket**: Initiates connections to servers
+### HTTP Methods
+- **GET**: Retrieve data (usually no body)
+- **POST**: Submit data (usually has body)
+- **PUT**: Update resource (usually has body)
+- **DELETE**: Remove resource (usually no body)
 
-### Node.js Event System
-- **Event-driven**: Code runs in response to events
-- **Non-blocking**: Can handle multiple connections simultaneously
-- **Asynchronous**: Operations don't block the main thread
+### HTTP Headers
+- **Host**: Required header specifying the server
+- **Content-Type**: Specifies the type of data in body
+- **Content-Length**: Size of the body in bytes
+- **User-Agent**: Client identification
+
+### Buffer vs String Handling
+- **Raw Data**: Received as Buffer (bytes)
+- **String Conversion**: `data.toString()` for parsing
+- **Line Splitting**: `\r\n` for HTTP line endings
 
 ## Next Steps
 
 In upcoming commits, we'll add:
-1. **HTTP Request Parsing**: Parse the raw TCP data into HTTP request objects
-2. **HTTP Response Generation**: Create proper HTTP responses
+1. **HTTP Response Generation**: Create proper HTTP responses with headers and body
 
-## 🤝 Contributing
+
+## Contributing
 
 This is a learning project! Feel free to:
 - Ask questions about the implementation
@@ -174,5 +244,5 @@ This is a learning project! Feel free to:
 - Create issues for bugs
 - Submit pull requests with enhancements
 
-**Current Commit**: Step 1 - Basic TCP Server Implementation
-**Next**: HTTP Request Parsing
+**Current Commit**: Step 2 - HTTP Request Parsing Implementation
+**Next**: HTTP Response Generation
