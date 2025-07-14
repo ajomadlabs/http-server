@@ -373,7 +373,7 @@ curl -X POST -H "Content-Type: application/json" \
   http://localhost:4000/api/echo
 ```
 
-## 🧪 Testing the Complete Implementation
+## Testing the Complete Implementation
 
 ### Basic Testing
 ```bash
