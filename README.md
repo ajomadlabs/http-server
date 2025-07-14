@@ -6,184 +6,251 @@ A step-by-step implementation of an HTTP server from scratch using Node.js. This
 
 The goal is to build a complete HTTP server from scratch, understanding each component as we add it. We'll start with basic TCP connections and gradually build up to implementing the core GET and POST HTTP methods.
 
-## Current Implementation: Step 3 - HTTP Response Generation
+## Current Implementation: Step 4 - GET Method Implementation
 
 ### What We Have So Far
 
-In this step, we've added complete HTTP response generation:
+In this step, we've implemented the GET method according to HTTP RFC specifications:
 - ✅ Accepts TCP connections
 - ✅ Receives raw data
 - ✅ Parses HTTP requests according to HTTP specification
-- ✅ **NEW**: Generates proper HTTP responses according to HTTP specification
-- ✅ **NEW**: Sends simple text responses with request details
-- ✅ **NEW**: Handles error responses with proper status codes
-- ❌ Doesn't handle different routes yet
+- ✅ Generates proper HTTP responses according to HTTP specification
+- ✅ **NEW**: Implements GET method according to RFC 7231
+- ✅ **NEW**: Handles query parameters according to RFC 3986
+- ✅ **NEW**: Validates GET request compliance (no body, safe, idempotent)
+- ✅ **NEW**: Provides multiple GET endpoints with educational content
+- ❌ POST method not yet implemented
 - ❌ Doesn't have middleware system yet
 
-### HTTP Response Specification Implementation
+### GET Method Specification (RFC 7231)
 
-The HTTP specification defines that a response consists of:
-1. **Status Line**: `VERSION STATUS_CODE STATUS_MESSAGE`
-2. **Headers**: Key-value pairs separated by `:`
-3. **Empty Line**: `\r\n\r\n` marks the end of headers
-4. **Body**: Response data after the empty line
+The GET method is defined in **RFC 7231: HTTP/1.1 Semantics and Content** with the following characteristics:
 
-#### The `createResponse()` Method
+#### RFC 7231 Section 4.3.1 - GET Method
+- **Purpose**: Retrieve a representation of the target resource
+- **Safe**: GET requests should not cause side effects on the server
+- **Idempotent**: Multiple identical GET requests have the same effect
+- **Cacheable**: GET responses can be cached (RFC 7234)
+- **Body**: GET requests should not have a request body
+
+#### RFC 3986 - URI Query Parameters
+- **Query String**: Parameters after `?` in the URI
+- **Format**: `key=value&key2=value2`
+- **Encoding**: URL-encoded parameters
+- **Example**: `/api/data?name=john&age=25`
+
+#### The `handleGET()` Method
 
 ```javascript
-createResponse(statusCode = 200, headers = {}, body = '') {
-    const statusMessages = {
-        200: 'OK',
-        201: 'Created',
-        400: 'Bad Request',
-        404: 'Not Found',
-        500: 'Internal Server Error'
-    };
+handleGET(request) {
+    console.log('=== GET Request Handling ===');
+    console.log('RFC 7231: GET method is safe and idempotent');
     
-    const statusMessage = statusMessages[statusCode] || 'Unknown';
-    
-    let response = `HTTP/1.1 ${statusCode} ${statusMessage}\r\n`;
-    
-    const defaultHeaders = {
-        'Content-Type': 'text/plain',
-        'Content-Length': Buffer.byteLength(body),
-        'Connection': 'close',
-        ...headers
-    };
-    
-    for (const [key, value] of Object.entries(defaultHeaders)) {
-        response += `${key}: ${value}\r\n`;
+    if (request.body.length > 0) {
+        console.log('Warning: GET request contains body (RFC 7231 violation)');
     }
+
+    const urlParts = request.path.split('?');
+    const path = urlParts[0];
+    const queryString = urlParts[1] || '';
     
-    response += '\r\n';
-    response += body;
-    
-    return response;
+    const queryParams = {};
+    if (queryString) {
+        queryString.split('&').forEach(param => {
+            const [key, value] = param.split('=');
+            if (key) {
+                queryParams[decodeURIComponent(key)] = decodeURIComponent(value || '');
+            }
+        });
+    }
+
+    switch (path) {
+        case '/':
+            break;
+        case '/api/status':
+            break;
+        case '/api/info':
+            break;
+        default:
+            break;
+    }
 }
 ```
 
-#### How HTTP Response Generation Works
+#### How GET Request Handling Works
 
-**1. Status Line Creation:**
-- Format: `HTTP/1.1 STATUS_CODE STATUS_MESSAGE`
-- Example: `HTTP/1.1 200 OK`
-- Status codes follow HTTP specification (200, 400, 404, 500, etc.)
+**1. RFC 7231 Compliance Check:**
+- **Body Validation**: GET requests should not have a body
+- **Safe Method**: No side effects on server state
+- **Idempotent**: Multiple requests produce same result
+- **Cacheable**: Responses can be cached
 
-**2. Header Generation:**
-- **Content-Type**: Specifies the type of response (text/plain, text/html, application/json)
-- **Content-Length**: Size of the body in bytes (calculated automatically)
-- **Connection**: Set to 'close' for simple HTTP/1.1 responses
-- **Custom Headers**: Can be passed as parameters
+**2. Query Parameter Parsing (RFC 3986):**
+- **URI Structure**: `scheme://authority/path?query#fragment`
+- **Query Format**: `key=value&key2=value2`
+- **URL Decoding**: `decodeURIComponent()` for parameter values
+- **Example**: `/api/data?name=john&age=25`
 
-**3. Body Attachment:**
-- Empty line (`\r\n\r\n`) separates headers from body
-- Body can be plain text, HTML, JSON, or any content type
-- Content-Length header must match actual body size
+**3. Path-Based Routing:**
+- **Root Path**: `/` - Welcome page with RFC information
+- **Status Path**: `/api/status` - Server status information
+- **Info Path**: `/api/info` - Detailed RFC compliance information
+- **404 Handling**: Unknown paths return proper 404 response
 
-**4. Complete Response Structure:**
-```
-HTTP/1.1 200 OK
-Content-Type: text/plain
-Content-Length: 234
-Connection: close
+**4. Response Generation:**
+- **Educational Content**: Each response includes RFC references
+- **Compliance Info**: Explains GET method characteristics
+- **Query Parameters**: Shows parsed query parameters
+- **Status Codes**: Proper HTTP status codes (200, 404)
 
-Request received successfully!
+### Available GET Endpoints
 
-Method: GET
-Path: /
-Version: HTTP/1.1
-
-Headers:
-  host: localhost:4000
-  user-agent: curl/7.68.0
-
-Body: (empty)
-
-This is a simple HTTP response showing the parsed request details.
+#### GET / - Welcome Page
+```bash
+curl http://localhost:4000/
 ```
 
-### HTTP Response Structure
+**Response:**
+```
+GET Request Received Successfully!
 
-The generated response follows the HTTP/1.1 specification:
+RFC 7231 Compliance:
+- Method: GET (Safe and Idempotent)
+- Path: /
+- Version: HTTP/1.1
 
-```javascript
-HTTP/1.1 200 OK
-Content-Type: text/plain
-Content-Length: 234
-Connection: close
+Request Details:
+- Host: localhost:4000
+- User-Agent: curl/7.68.0
+- Accept: */*
 
-Request received successfully!
+Query Parameters: None
 
-Method: GET
-Path: /
-Version: HTTP/1.1
-
-Headers:
-  host: localhost:4000
-  user-agent: curl/7.68.0
-
-Body: (empty)
-
-This is a simple HTTP response showing the parsed request details.
+RFC References:
+- RFC 7231: HTTP/1.1 Semantics and Content (GET method)
+- RFC 3986: Uniform Resource Identifier (URI) Generic Syntax
+- RFC 7230: HTTP/1.1 Message Syntax and Routing
 ```
 
-### Status Code Handling
-
-Our server now handles different HTTP status codes:
-
-- **200 OK**: Successful response
-- **201 Created**: Resource created successfully
-- **400 Bad Request**: Invalid HTTP request format
-- **404 Not Found**: Resource not found (will implement in next step)
-- **500 Internal Server Error**: Server error
-
-### Error Response Generation
-
-When parsing fails, we send a proper error response:
-
-```javascript
-const errorResponse = this.createResponse(400, {
-    'Content-Type': 'text/plain'
-}, 'Bad Request - Invalid HTTP format');
+#### GET /api/status - Server Status
+```bash
+curl http://localhost:4000/api/status
 ```
 
-This generates:
+**Response:**
 ```
-HTTP/1.1 400 Bad Request
-Content-Type: text/plain
-Content-Length: 35
-Connection: close
+Server Status (GET /api/status)
 
-Bad Request - Invalid HTTP format
+RFC 7231: GET method for resource retrieval
+Status: Running
+Timestamp: 2024-01-01T12:00:00.000Z
+Uptime: 123.45 seconds
+Port: 4000
+
+RFC Compliance:
+- Safe: GET requests should not cause side effects
+- Idempotent: Multiple identical GET requests have same effect
+- Cacheable: GET responses can be cached (RFC 7234)
 ```
 
-### Complete Request-Response Flow
+#### GET /api/info - Server Information
+```bash
+curl http://localhost:4000/api/info
+```
 
-Now our server handles the complete HTTP cycle:
+**Response:**
+```
+HTTP Server Information (GET /api/info)
 
-1. **Client sends HTTP request** → TCP connection established
-2. **Server receives raw data** → Accumulates until complete request
-3. **Server parses request** → Extracts method, path, headers, body
-4. **Server generates response** → Creates proper HTTP response
-5. **Server sends response** → Client receives formatted response
-6. **Connection closes** → TCP connection terminated
+RFC 7231 GET Method Characteristics:
+1. Safe: No side effects on server state
+2. Idempotent: Multiple requests produce same result
+3. Cacheable: Responses can be cached
+4. Body: Should not have request body (RFC 7231 Section 4.3.1)
+
+Request Information:
+- Method: GET
+- Path: /api/info
+- Version: HTTP/1.1
+- Headers Count: 3
+
+RFC References:
+- RFC 7231 Section 4.3.1: GET method definition
+- RFC 7234: HTTP/1.1 Caching
+- RFC 3986: URI syntax and query parameters
+```
+
+#### GET with Query Parameters
+```bash
+curl "http://localhost:4000/?name=john&age=25&city=newyork"
+```
+
+**Response includes:**
+```
+Query Parameters: name=john, age=25, city=newyork
+```
+
+### RFC Compliance Features
+
+#### RFC 7231 Compliance
+- **Safe Method**: GET requests don't modify server state
+- **Idempotent**: Multiple identical requests have same effect
+- **No Body**: GET requests should not have request body
+- **Cacheable**: Responses can be cached by clients
+
+#### RFC 3986 URI Compliance
+- **Query Parameter Parsing**: Properly parses `?key=value` format
+- **URL Decoding**: Handles encoded characters correctly
+- **Multiple Parameters**: Supports `&` separated parameters
+
+#### RFC 7230 Message Format
+- **Proper Headers**: Correct HTTP/1.1 header format
+- **Status Codes**: Proper HTTP status codes
+- **Response Format**: Correct HTTP response structure
+
+### Error Handling
+
+#### 404 Not Found (RFC 7231 Section 6.5.4)
+```bash
+curl http://localhost:4000/nonexistent
+```
+
+**Response:**
+```
+404 Not Found
+
+RFC 7231: GET method for resource retrieval
+Requested path '/nonexistent' not found.
+
+Available GET endpoints:
+- GET / - Welcome page
+- GET /api/status - Server status
+- GET /api/info - Server information
+
+RFC 7231 Section 6.5.4: 404 Not Found status code
+The origin server did not find a current representation for the target resource.
+```
+
+#### 405 Method Not Allowed
+```bash
+curl -X PUT http://localhost:4000/
+```
+
+**Response:**
+```
+405 Method Not Allowed - Method 'PUT' not supported
+```
 
 ### Enhanced Logging
 
-We now log both request parsing and response generation:
+We now log GET-specific information:
 
 ```
-=== HTTP Request Parsed ===
-Method:: GET
-Path:: /
-Version:: HTTP/1.1
-Headers:: { host: 'localhost:4000', user-agent: 'curl/7.68.0' }
-Body:: 
-==========================
-
-=== HTTP Response Generated ===
-Status: 200 OK
-Headers: { 'Content-Type': 'text/plain', 'Content-Length': 234 }
+=== GET Request Handling ===
+RFC 7231: GET method is safe and idempotent
+Path: /api/status
+Headers: { host: 'localhost:4000', user-agent: 'curl/7.68.0' }
+Body length: 0
 ==========================
 ```
 
@@ -198,65 +265,54 @@ You should see:
 Server Started at Port:: 4000
 ```
 
-## Testing the Current Implementation
+## Testing the GET Implementation
 
-You can test the complete HTTP request-response cycle:
+You can test the GET method implementation:
 
 ```bash
-# Basic GET request
 curl http://localhost:4000/
 
-# POST request with body
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"message": "Hello World"}' \
-  http://localhost:4000/api/test
+curl "http://localhost:4000/?name=john&age=25"
 
-# Request with custom headers
-curl -H "X-Custom-Header: test" \
-  -H "Authorization: Bearer token123" \
-  http://localhost:4000/
+curl http://localhost:4000/api/status
+
+curl http://localhost:4000/api/info
+
+curl http://localhost:4000/nonexistent
+
+curl -X PUT http://localhost:4000/
 ```
-
-When you make requests, you'll see:
-1. **Request parsing logs** showing the parsed HTTP request
-2. **Response generation logs** showing the HTTP response details
-3. **Plain text response** showing the request details in a clear, readable format
 
 ## Learning Points
 
-### HTTP Response Specification
-- **Status Line**: Must include version, status code, and status message
-- **Headers**: Key-value pairs with proper formatting
-- **Body Separation**: Empty line (`\r\n\r\n`) required between headers and body
-- **Content-Length**: Must accurately reflect body size in bytes
+### RFC 7231 - GET Method Specification
+- **Safe**: GET requests should not cause side effects
+- **Idempotent**: Multiple identical requests have same effect
+- **Cacheable**: Responses can be cached by clients
+- **No Body**: GET requests should not have request body
 
-### HTTP Status Codes
-- **2xx Success**: 200 OK, 201 Created
-- **4xx Client Error**: 400 Bad Request, 404 Not Found
-- **5xx Server Error**: 500 Internal Server Error
+### RFC 3986 - URI Query Parameters
+- **Query String**: Parameters after `?` in URI
+- **Format**: `key=value&key2=value2`
+- **URL Encoding**: Special characters must be encoded
+- **Parsing**: Split by `&` and `=` for key-value pairs
 
-### Content-Type Headers
-- **text/plain**: For simple text responses (what we're using)
-- **text/html**: For HTML responses
-- **application/json**: For JSON responses
-- **image/png**: For image responses
+### HTTP Status Codes (RFC 7231)
+- **200 OK**: Successful GET request
+- **404 Not Found**: Resource not found (Section 6.5.4)
+- **405 Method Not Allowed**: Method not supported
+- **501 Not Implemented**: Method not yet implemented
 
-### Buffer.byteLength()
-- **Purpose**: Calculates the exact byte length of a string
-- **Why Important**: Content-Length header must be accurate
-- **Example**: `Buffer.byteLength("Hello")` returns `5`
-
-### HTTP/1.1 vs HTTP/1.0
-- **HTTP/1.1**: Supports persistent connections (Connection: keep-alive)
-- **HTTP/1.0**: Defaults to Connection: close
-- **Our Implementation**: Uses Connection: close for simplicity
+### GET Method Best Practices
+- **No Side Effects**: GET should only retrieve data
+- **Idempotent**: Same request always returns same result
+- **Cacheable**: Responses can be cached
+- **Query Parameters**: Use for filtering/sorting, not data submission
 
 ## Next Steps
 
-In upcoming commits, we'll implement the core HTTP methods:
-
-1. **GET Method Implementation**: Handle GET requests with proper responses
-2. **POST Method Implementation**: Handle POST requests with body parsing
+In the final step, we'll implement:
+1. **POST Method Implementation**: Handle POST requests with body parsing according to RFC 7231
 
 **Note**: We're focusing only on GET and POST methods as these are the most fundamental HTTP methods. This keeps the learning focused and manageable.
 
@@ -268,5 +324,5 @@ This is a learning project! Feel free to:
 - Create issues for bugs
 - Submit pull requests with enhancements
 
-**Current Commit**: Step 3 - HTTP Response Generation Implementation
-**Next**: GET Method Implementation
+**Current Commit**: Step 4 - GET Method Implementation (RFC 7231)
+**Next**: POST Method Implementation
