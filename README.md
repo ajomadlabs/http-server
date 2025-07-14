@@ -179,7 +179,7 @@ telnet localhost 4000
 - Understand the specifications
 - Learn why certain decisions were made
 
-### 🔍 What You'll Learn at Each Step
+### What You'll Learn at Each Step
 
 #### Step 1: TCP Fundamentals
 - **Socket Programming**: How network connections work
