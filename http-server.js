@@ -91,7 +91,6 @@ class HTTP {
                         console.log('Body::', request.body);
                         console.log('==========================');
                         
-                        // Create simple text response
                         const responseBody = `Request received successfully!
 
                         Method: ${request.method}
