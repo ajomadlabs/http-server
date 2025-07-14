@@ -37,13 +37,38 @@ class HTTP {
             body = lines.slice(bodyStartIndex).join('\r\n');
         }
         
-        return {
-            method,
-            path,
-            version,
-            headers,
-            body
+        return { method, path, version, headers, body };
+    }
+
+    createResponse(statusCode = 200, headers = {}, body = '') {
+        const statusMessages = {
+            200: 'OK',
+            201: 'Created',
+            400: 'Bad Request',
+            404: 'Not Found',
+            500: 'Internal Server Error'
         };
+        
+        const statusMessage = statusMessages[statusCode] || 'Unknown';
+        
+        let response = `HTTP/1.1 ${statusCode} ${statusMessage}\r\n`;
+        
+        const defaultHeaders = {
+            'Content-Type': 'text/plain',
+            'Content-Length': Buffer.byteLength(body),
+            'Connection': 'close',
+            ...headers
+        };
+        
+        for (const [key, value] of Object.entries(defaultHeaders)) {
+            response += `${key}: ${value}\r\n`;
+        }
+        
+        response += '\r\n';
+        
+        response += body;
+        
+        return response;
     }
 
     start() {
@@ -66,8 +91,43 @@ class HTTP {
                         console.log('Body::', request.body);
                         console.log('==========================');
                         
+                        // Create simple text response
+                        const responseBody = `Request received successfully!
+
+                        Method: ${request.method}
+                        Path: ${request.path}
+                        Version: ${request.version}
+
+                        Headers:
+                            ${Object.entries(request.headers).map(([key, value]) => `  ${key}: ${value}`).join('\n')}
+
+                        Body: ${request.body || '(empty)'}
+
+                        This is a simple HTTP response showing the parsed request details.`;
+
+                        const response = this.createResponse(200, {
+                            'Content-Type': 'text/plain'
+                        }, responseBody);
+                        
+                        console.log('=== HTTP Response Generated ===');
+                        console.log('Status: 200 OK');
+                        console.log('Headers:', {
+                            'Content-Type': 'text/plain',
+                            'Content-Length': Buffer.byteLength(responseBody)
+                        });
+                        console.log('==========================');
+                        
+                        socket.write(response);
+                        socket.end();
+                        
                     } catch (error) {
                         console.log('Error parsing HTTP request::', error);
+                        
+                        const errorResponse = this.createResponse(400, {
+                            'Content-Type': 'text/plain'
+                        }, 'Bad Request - Invalid HTTP format');
+                        
+                        socket.write(errorResponse);
                         socket.end();
                     }
                 }
